@@ -1,0 +1,72 @@
+---
+- hosts: all
+  become: true
+#
+# HANDLER
+  handlers:
+    - name: restart nginx
+      service: name=nginx state=restarted
+#
+# TASKS
+  tasks:
+    - name: Make sure we can connect
+      ping:
+#
+# TOOLS Install
+    - name: Install required tools
+      apt: name={{item}} state=installed
+      with_items:
+        - unzip
+#
+# PHP
+    - name: Add the ondrej PHP PPA
+      apt_repository: repo='ppa:ondrej/php'
+    - name: Update the apt cache
+      apt: update_cache=yes cache_valid_time=3600
+    - name: Install PHP
+      apt: name={{item}} state=installed
+      with_items:
+        - php
+        - php-fpm
+        - php-mysql
+        - php-xml
+#
+# REMOVE APACHE2 - "installed automatically, no way around it, just remove it"
+    - name: Remove apache2
+      apt: name=apache2 state=removed
+#
+# MySQL
+    - name: Install MySQL
+      apt: name={{item}} state=installed
+      with_items:
+        - mysql-server
+        - python-mysqldb
+#
+# Excluded MySQL Security
+#
+
+# NGINX
+    - name: Install nginx
+      apt: name=nginx state=installed
+    - name: Start nginx
+      service: name=nginx state=started
+#
+# NGINX CONFIG template/default to /etc /nginx/sites-available/default
+    - name: Create nginx config
+      template: src=templates/nginx/default dest=/etc/nginx/sites-available/default
+      notify: restart nginx
+#
+# WordPress
+    - name: Copy wordpress.zip into tmp
+      copy: src=files/wordpress.zip dest=/tmp/wordpress.zip
+
+    - name: Unzip WordPress
+      unarchive: src=/tmp/wordpress.zip dest=/tmp copy=no creates=/tmp/wordpress/wp-settings.php
+
+
+    - name: Create project folder
+      file: dest=/var/www/book.example.com state=directory
+    - name: Copy WordPress files
+      command: cp -a /tmp/wordpress/. /var/www/book.example.com creates=/var/www/book.example.com/wp-settings.php
+#
+
